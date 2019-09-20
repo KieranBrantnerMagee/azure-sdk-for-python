@@ -1051,22 +1051,51 @@ class ContainerClient(StorageAccountHostsMixin):
             The timeout parameter is expressed in seconds.
         :rtype: None
         """
+        from azure.core.pipeline.transport import HttpTransport, HttpResponse
+        from azure.core.pipeline import Pipeline
+        class ExtractRequestTransport(HttpTransport):
+            def send(self, request, **kwargs):
+                # type: (PipelineRequest, Any) -> PipelineResponse
+                """Send the request using this HTTP sender.
+                """
+                self.request = request
+                response = HttpResponse(None, None)
+                response.status_code = 202
+                return response
+
+            def open(self): pass
+            def close(self): pass
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def sleep(self, duration): pass
+        extractor = ExtractRequestTransport()
+
+        http_request_preparer = AzureBlobStorage(
+            "https://localhost/",
+            pipeline=Pipeline(transport=extractor)
+        )
+
         options = BlobClient._generic_delete_blob_options(
             delete_snapshots=delete_snapshots,
             lease=lease,
             timeout=timeout,
             **kwargs
         )
-        query_parameters, header_parameters = self._generate_delete_blobs_options(**options)
+
+        http_request_preparer.blob.delete(**options)
+        request = extractor.request
+        request.url = request.url[len("https://localhost/"):]
+        del request.headers['x-ms-version']
+
+        # query_parameters, header_parameters = self._generate_delete_blobs_options(**options)
 
         reqs = []
         for blob in blobs:
             req = HttpRequest(
                 "DELETE",
-                "/{}/{}".format(self.container_name, blob),
-                headers=header_parameters
+                "/{}/{}".format(self.container_name, blob) + request.url,
+                headers=request.headers
             )
-            req.format_parameters(query_parameters)
             reqs.append(req)
 
         request = self._client._client.post(
