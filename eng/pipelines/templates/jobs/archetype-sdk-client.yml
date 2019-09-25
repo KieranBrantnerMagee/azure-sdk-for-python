@@ -1,0 +1,100 @@
+parameters:
+  ServiceDirectory: ''
+  BeforePublishSteps: []
+  TestMarkArgument: ''
+  BuildTargetingString: 'azure-*'
+  TestTimeoutInMinutes: 0
+
+jobs:
+  - job: 'Build'
+    variables:
+    - template: ../variables/globals.yml
+
+    pool:
+      vmImage: 'ubuntu-16.04'
+
+    steps:
+    - template: ../steps/build-artifacts.yml
+      parameters: 
+        ServiceDirectory: ${{ parameters.ServiceDirectory }}
+        BuildTargetingString: ${{ parameters.BuildTargetingString }}
+        BeforePublishSteps: ${{ parameters.BeforePublishSteps }}
+
+  - job: 'Analyze'
+    variables:
+    - template: ../variables/globals.yml
+
+    dependsOn:
+      - 'Build'
+
+    pool:
+      vmImage: 'ubuntu-16.04'
+
+    steps:
+    - template: ../steps/analyze.yml
+
+  - job: 'Test'
+    timeoutInMinutes: ${{ parameters.TestTimeoutInMinutes }}
+    variables:
+    - template: ../variables/globals.yml
+
+    dependsOn:
+       - 'Build'
+
+    strategy:
+      matrix:
+        Linux_Python27:
+          OSName: 'Linux'
+          OSVmImage: 'ubuntu-16.04'
+          PythonVersion: '2.7'
+          CoverageArg: ''
+        Linux_Python35:
+          OSName: 'Linux'
+          OSVmImage: 'ubuntu-16.04'
+          PythonVersion: '3.5'
+          CoverageArg: ''
+        Linux_Python36:
+          OSName: 'Linux'
+          OSVmImage: 'ubuntu-16.04'
+          PythonVersion: '3.6'
+          CoverageArg: ''
+        Linux_Python37:
+          OSName: 'Linux'
+          OSVmImage: 'ubuntu-16.04'
+          PythonVersion: '3.7'
+          CoverageArg: ''
+        Windows_Python35:
+          OSName: 'Windows'
+          OSVmImage: 'windows-2019'
+          PythonVersion: '3.5'
+          CoverageArg: ''
+        MacOS_Python27:
+          OSName: 'MacOS'
+          OSVmImage: 'macOS-10.13'
+          PythonVersion: '2.7'
+          CoverageArg: ''
+        Linux_pypy3:
+          OSName: 'Linux'
+          OSVmImage: 'ubuntu-16.04'
+          PythonVersion: 'pypy3'
+          CoverageArg: '--disablecov'
+
+    pool:
+      vmImage: '$(OSVmImage)'
+
+    steps:
+    - template: ../steps/build-test.yml
+      parameters:
+        ServiceDirectory: ${{ parameters.ServiceDirectory }}
+        TestMarkArgument: ${{ parameters.TestMarkArgument }}
+        AdditionalTestArgs: '--wheel_dir="$(Build.ArtifactStagingDirectory)"'
+        OSName: $(OSName)
+        CoverageArg: $(CoverageArg)
+        PythonVersion: $(PythonVersion)
+        BuildTargetingString: ${{ parameters.BuildTargetingString }}
+        ToxTestEnv: 'whl,sdist'
+        BeforeTestSteps: 
+          - task: DownloadPipelineArtifact@0
+            inputs:
+              artifactName: 'artifacts' 
+              targetPath: $(Build.ArtifactStagingDirectory)
