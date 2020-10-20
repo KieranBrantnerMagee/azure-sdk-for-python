@@ -10,6 +10,7 @@ from ._servicebus_session_receiver_async import ServiceBusSessionReceiver
 from ._servicebus_session_async import ServiceBusSession
 from ._servicebus_client_async import ServiceBusClient
 from ._async_auto_lock_renewer import AutoLockRenew
+from ._credentials_async import ServiceBusSharedKeyCredential, ServiceBusSharedTokenCredential
 
 __all__ = [
     'ReceivedMessage',
@@ -18,5 +19,7 @@ __all__ = [
     'ServiceBusReceiver',
     'ServiceBusSessionReceiver',
     'ServiceBusSession',
-    'AutoLockRenew'
+    'AutoLockRenew',
+    'ServiceBusSharedTokenCredential',
+    'ServiceBusSharedKeyCredential'
 ]

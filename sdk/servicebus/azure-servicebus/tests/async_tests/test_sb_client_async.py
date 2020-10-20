@@ -10,7 +10,7 @@ import pytest
 
 from azure.servicebus.aio import ServiceBusClient
 from azure.servicebus import Message
-from azure.servicebus.aio._base_handler_async import ServiceBusSharedKeyCredential
+from azure.servicebus.aio import ServiceBusSharedKeyCredential
 from devtools_testutils import AzureMgmtTestCase, CachedResourceGroupPreparer
 from servicebus_preparer import CachedServiceBusNamespacePreparer, CachedServiceBusQueuePreparer
 from utilities import get_logger

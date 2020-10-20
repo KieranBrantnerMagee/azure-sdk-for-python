@@ -14,11 +14,11 @@ from uamqp.message import MessageProperties
 
 from azure.core.credentials import AccessToken
 
-from .._base_handler import _generate_sas_token, _AccessToken, BaseHandler as BaseHandlerSync
+from .._base_handler import BaseHandler as BaseHandlerSync
+from .._credentials import _AccessToken
 from .._common._configuration import Configuration
 from .._common.utils import create_properties
 from .._common.constants import (
-    TOKEN_TYPE_SASTOKEN,
     MGMT_REQUEST_OP_TYPE_ENTITY_MGMT,
     ASSOCIATEDLINKPROPERTYNAME,
     CONTAINER_PREFIX, MANAGEMENT_PATH_SUFFIX)
@@ -27,58 +27,23 @@ from ..exceptions import (
     OperationTimeoutError,
     _create_servicebus_exception
 )
+from ._credentials_async import (
+    ServiceBusSharedTokenCredential,
+    ServiceBusSharedKeyCredential,
+    ServiceBusValidAsyncCredentialTypes
+)
 
 if TYPE_CHECKING:
     from azure.core.credentials import TokenCredential
 
 _LOGGER = logging.getLogger(__name__)
 
-
-class ServiceBusSASTokenCredential(object):
-    """The shared access token credential used for authentication.
-    :param str token: The shared access token string
-    :param int expiry: The epoch timestamp
-    """
-    def __init__(self, token: str, expiry: int) -> None:
-        """
-        :param str token: The shared access token string
-        :param int expiry: The epoch timestamp
-        """
-        self.token = token
-        self.expiry = expiry
-        self.token_type = b"servicebus.windows.net:sastoken"
-
-    async def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:  # pylint:disable=unused-argument
-        """
-        This method is automatically called when token is about to expire.
-        """
-        return AccessToken(self.token, self.expiry)
-
-
-class ServiceBusSharedKeyCredential(object):
-    """The shared access key credential used for authentication.
-
-    :param str policy: The name of the shared access policy.
-    :param str key: The shared access key.
-    """
-
-    def __init__(self, policy: str, key: str) -> None:
-        self.policy = policy
-        self.key = key
-        self.token_type = TOKEN_TYPE_SASTOKEN
-
-    async def get_token(self, *scopes: str, **kwargs: Any) -> _AccessToken:  # pylint:disable=unused-argument
-        if not scopes:
-            raise ValueError("No token scope provided.")
-        return _generate_sas_token(scopes[0], self.policy, self.key)
-
-
 class BaseHandler:
     def __init__(
         self,
         fully_qualified_namespace: str,
         entity_name: str,
-        credential: "TokenCredential",
+        credential: ServiceBusValidAsyncCredentialTypes,
         **kwargs: Any
     ) -> None:
         self.fully_qualified_namespace = fully_qualified_namespace
@@ -103,7 +68,7 @@ class BaseHandler:
     @classmethod
     def _create_credential_from_connection_string_parameters(cls, token, token_expiry, policy, key):
         if token and token_expiry:
-            return ServiceBusSASTokenCredential(token, token_expiry)
+            return ServiceBusSharedTokenCredential(token, token_expiry)
         return ServiceBusSharedKeyCredential(policy, key)
 
     async def __aenter__(self):

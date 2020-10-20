@@ -16,6 +16,7 @@ from ._servicebus_session import ServiceBusSession
 from ._common.message import Message, BatchMessage, PeekedMessage, ReceivedMessage
 from ._common.constants import ReceiveMode, SubQueue
 from ._common.auto_lock_renewer import AutoLockRenew
+from ._credentials import ServiceBusSharedKeyCredential, ServiceBusSharedTokenCredential
 
 TransportType = constants.TransportType
 
@@ -32,5 +33,7 @@ __all__ = [
     'ServiceBusSession',
     'ServiceBusSender',
     'TransportType',
-    'AutoLockRenew'
+    'AutoLockRenew',
+    'ServiceBusSharedTokenCredential',
+    'ServiceBusSharedKeyCredential'
 ]

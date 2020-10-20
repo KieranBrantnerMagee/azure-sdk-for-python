@@ -2,23 +2,14 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import collections
 import logging
 import uuid
 import time
-from datetime import timedelta
 from typing import cast, Optional, Tuple, TYPE_CHECKING, Dict, Any, Callable
 
-try:
-    from urllib import quote_plus  # type: ignore
-except ImportError:
-    from urllib.parse import quote_plus
-
 import uamqp
-from uamqp import utils, compat
+from uamqp import compat
 from uamqp.message import MessageProperties
-
-from azure.core.credentials import AccessToken
 
 from ._common._configuration import Configuration
 from .exceptions import (
@@ -31,15 +22,18 @@ from ._common.utils import create_properties
 from ._common.constants import (
     CONTAINER_PREFIX,
     MANAGEMENT_PATH_SUFFIX,
-    TOKEN_TYPE_SASTOKEN,
     MGMT_REQUEST_OP_TYPE_ENTITY_MGMT,
     ASSOCIATEDLINKPROPERTYNAME
+)
+from ._credentials import (
+    ServiceBusSharedTokenCredential,
+    ServiceBusSharedKeyCredential,
+    ServiceBusValidCredentialTypes
 )
 
 if TYPE_CHECKING:
     from azure.core.credentials import TokenCredential
 
-_AccessToken = collections.namedtuple("AccessToken", "token expires_on")
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -94,67 +88,6 @@ def _parse_conn_str(conn_str):
             shared_access_signature_expiry)
 
 
-def _generate_sas_token(uri, policy, key, expiry=None):
-    # type: (str, str, str, Optional[timedelta]) -> _AccessToken
-    """Create a shared access signiture token as a string literal.
-    :returns: SAS token as string literal.
-    :rtype: str
-    """
-    if not expiry:
-        expiry = timedelta(hours=1)  # Default to 1 hour.
-
-    abs_expiry = int(time.time()) + expiry.seconds
-    encoded_uri = quote_plus(uri).encode("utf-8")  # pylint: disable=no-member
-    encoded_policy = quote_plus(policy).encode("utf-8")  # pylint: disable=no-member
-    encoded_key = key.encode("utf-8")
-
-    token = utils.create_sas_token(encoded_policy, encoded_key, encoded_uri, expiry)
-    return _AccessToken(token=token, expires_on=abs_expiry)
-
-
-class ServiceBusSASTokenCredential(object):
-    """The shared access token credential used for authentication.
-    :param str token: The shared access token string
-    :param int expiry: The epoch timestamp
-    """
-    def __init__(self, token, expiry):
-        # type: (str, int) -> None
-        """
-        :param str token: The shared access token string
-        :param float expiry: The epoch timestamp
-        """
-        self.token = token
-        self.expiry = expiry
-        self.token_type = b"servicebus.windows.net:sastoken"
-
-    def get_token(self, *scopes, **kwargs):  # pylint:disable=unused-argument
-        # type: (str, Any) -> AccessToken
-        """
-        This method is automatically called when token is about to expire.
-        """
-        return AccessToken(self.token, self.expiry)
-
-
-class ServiceBusSharedKeyCredential(object):
-    """The shared access key credential used for authentication.
-
-    :param str policy: The name of the shared access policy.
-    :param str key: The shared access key.
-    """
-
-    def __init__(self, policy, key):
-        # type: (str, str) -> None
-        self.policy = policy
-        self.key = key
-        self.token_type = TOKEN_TYPE_SASTOKEN
-
-    def get_token(self, *scopes, **kwargs):  # pylint:disable=unused-argument
-        # type: (str, Any) -> _AccessToken
-        if not scopes:
-            raise ValueError("No token scope provided.")
-        return _generate_sas_token(scopes[0], self.policy, self.key)
-
-
 class BaseHandler:  # pylint:disable=too-many-instance-attributes
     def __init__(
         self,
@@ -163,7 +96,7 @@ class BaseHandler:  # pylint:disable=too-many-instance-attributes
         credential,
         **kwargs
     ):
-        # type: (str, str, TokenCredential, Any) -> None
+        # type: (str, str, ServiceBusValidCredentialTypes, Any) -> None
         self.fully_qualified_namespace = fully_qualified_namespace
         self._entity_name = entity_name
 
@@ -210,7 +143,7 @@ class BaseHandler:  # pylint:disable=too-many-instance-attributes
     @classmethod
     def _create_credential_from_connection_string_parameters(cls, token, token_expiry, policy, key):
         if token and token_expiry:
-            return ServiceBusSASTokenCredential(token, token_expiry)
+            return ServiceBusSharedTokenCredential(token, token_expiry)
         return ServiceBusSharedKeyCredential(policy, key)
 
     def __enter__(self):

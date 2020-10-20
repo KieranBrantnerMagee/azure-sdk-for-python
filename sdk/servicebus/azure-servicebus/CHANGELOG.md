@@ -9,6 +9,7 @@
   - `ServiceBusReceiver`: `receive_deferred_messages` and `peek_messages`
   - `ServiceBusSession`: `get_state`, `set_state` and `renew_lock`
   - `ReceivedMessage`: `renew_lock`
+* Expose `ServiceBusSharedKeyCredential` and `ServiceBusSharedTokenCredential` via `azure.servicebus` and `azure.servicebus.aio` for credential-based authentication via service-bus-specific keys and tokens.
 
 **BugFixes**
 
